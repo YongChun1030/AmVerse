@@ -407,7 +407,7 @@ def rag_query():
     sources_summary_text = "\n".join(sources_summary)
 
     reask_query = f"""
-    Based on the following answer and the sources provided, identify the which source, page number (the page number is not following the actual one you must figure out which one is correct), and screenshot url used to construct the answer.
+    Based on the following answer and the sources provided, identify which source, page number (the page number may not follow the actual one; you must determine the correct one), and screenshot URL were used to construct the answer.
 
     Answer:
     {response_text}
@@ -415,26 +415,34 @@ def rag_query():
     Sources:
     {sources_summary_text}
 
-    Format your response as a list:
+    Important Instructions:
+    1. Return your response as a list in the exact format below:
     - Source: [source], Page: [correct_page_number], Screenshot URL: [screenshot_url]
-    
-    Ensure the page number is accurate and verify the information aligns with the answer.
+    2. Do not encode, reformat, or modify the URLs in any way. Ensure the `screenshot_url` matches the exact format provided in the `sources_summary_text`, including spaces or special characters.
+    3. Verify that the page number and content align with the answer while ensuring the URLs remain unchanged.
     """
 
     gpt_response = chain(reask_query)
     used_sources_text = gpt_response.get("result", "")
 
+    logging.info(f"The screenshot URLs: {used_sources_text}")
+
     # Step 4: Match sources explicitly mentioned by GPT
     used_sources = []
     for doc in source_documents:
         source_identifier = f"Source: {doc.metadata.get('source')}, Page: {doc.metadata.get('page_number')}, Screenshot URL: {doc.metadata.get('screenshot_url', 'N/A')}"
-        if source_identifier in used_sources_text:
+        
+        # Normalize for comparison
+        normalized_used_sources_text = used_sources_text.lower().replace("\n", "").strip()
+        normalized_source_identifier = source_identifier.lower().strip()
+        
+        if normalized_source_identifier in normalized_used_sources_text:
             used_sources.append({
                 "content": doc.page_content,
                 "metadata": {
                     "source": doc.metadata.get("source"),
                     "page_number": doc.metadata.get("page_number"),
-                    "screenshot_url": doc.metadata.get("screenshot_url")  # Include screenshot URL
+                    "screenshot_url": doc.metadata.get("screenshot_url")
                 }
             })
 

@@ -7,8 +7,8 @@ import { supabase } from './supabase';
 const CustomizeAmVerse = () => {
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
-    const [indexType, setIndexType] = useState("User");
-    const [privateName, setPrivateName] = useState('');
+    //const [indexType, setIndexType] = useState("User");
+    //const [privateName, setPrivateName] = useState('');
     const [customPrompt, setCustomPrompt] = useState("");
     const [conversation, setConversation] = useState([]);
     const [userMessage, setUserMessage] = useState("");
@@ -73,6 +73,7 @@ const CustomizeAmVerse = () => {
                 if (userId) {
                     await loadChatHistoryFromCustomChat(userId);
                     await loadLatestPromptTemplate(userId);
+                    setCustomPrompt(""); // Clear the prompt
                 } else {
                     console.error("User ID not found during initialization.");
                 }
@@ -112,9 +113,11 @@ const CustomizeAmVerse = () => {
         setCustomPrompt(e.target.value);
     };
 
+    /*
     const handleNameChange = (e) => {
         setPrivateName(e.target.value);
-    }; 
+    };
+    */ 
 
     const handleChatSubmit = async () => {
         if (!userMessage.trim()) return;
@@ -253,13 +256,52 @@ const CustomizeAmVerse = () => {
             return;
         }
         
-        if (indexType === "Private" && !privateName.trim()) {
-            alert("Please provide a name for the Private index.");
-            return;
-        }
+        //if (indexType === "Private" && !privateName.trim()) {
+        //    alert("Please provide a name for the Private index.");
+        //    return;
+        //}
 
         setUploading(true);
-        
+
+        try {
+            const deleteResponse = await axios.post("http://127.0.0.1:5000/delete_previous_file", {
+                customer_name: customerName,
+                index_type: "User",
+            });
+
+            if (!deleteResponse.data.success) {
+                console.warn("Deletion response:", deleteResponse.data.message);
+            } else {
+                console.log(deleteResponse.data.message);
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("indexType", "User");
+            formData.append("customerName", customerName);
+            formData.append("customPrompt", customPrompt);
+
+            const uploadResponse = await axios.post("http://127.0.0.1:5000/ingest_pdfs", formData, {
+                headers: { "Content-Type": "multipart/form-data" },
+            });
+
+            if (uploadResponse.data.success) {
+                alert("File successfully uploaded and processed!");
+                const updatedConversation = [{ sender: "AmVerse", text: customPrompt }];
+                setConversation(updatedConversation);
+
+                await saveChatToCustomChat(updatedConversation);
+            } else {
+                throw new Error(uploadResponse.data.message);
+            }
+        } catch (error) {
+            console.error("Error during file upload:", error.message);
+            alert("Error uploading file: " + error.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+     /*   
         try {
             if (indexType === "User") {
                 const deleteResponse = await axios.post("http://127.0.0.1:5000/delete_previous_file", {
@@ -301,6 +343,7 @@ const CustomizeAmVerse = () => {
             setUploading(false);
         }
     };
+    */
 
     const handleLogout = () => {
         sessionStorage.removeItem('token');
@@ -386,6 +429,8 @@ const CustomizeAmVerse = () => {
                 </h3>
                 {isSectionOpen && (
                     <div style={styles.customizationSection}>
+                        
+                        {/*
                         <select
                             value={indexType}
                             onChange={(e) => setIndexType(e.target.value)}
@@ -405,6 +450,7 @@ const CustomizeAmVerse = () => {
                                 style={styles.textInput}
                             />
                         )}
+                        */}
         
                         <input type="file" accept=".pdf" onChange={handleFileChange} style={styles.fileInput} />
                         <p style={styles.supportedFiles}>Supported File Type: PDF</p>
